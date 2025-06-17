@@ -1,0 +1,99 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                        FastAPI Server Pipeline (`main.py`)                    ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                Overview Flow                                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ User's New Query ─────────────────────────────────────────────────────┐      │
+│ Optional Chat History (if any)                                        │      │
+│                                                                       ▼      │
+│ +────────────────────────────+                                        │      │
+│ | STEP 1: Condense with      |                                        │      │
+│ |         History            |--------------------------------------->│      │
+│ | (LLM generates standalone  |   E.g., "What is a unique key and      │      │
+│ |  question from context)    |         how does it compare to a PK?"  │      │
+│ +────────────────────────────+                                        ▼      │
+│ +────────────────────────────+                                        │      │
+│ | STEP 2: Orchestrator Agent |                                        │      │
+│ |         - Intent Classifier|--------------------------------------->│      │
+│ |         - Uses LLM         |   Output: Intent = "Comparative"       │      │
+│ +────────────────────────────+                                        ▼      │
+│ +────────────────────────────+                                        │      │
+│ | STEP 3: Query Expansion    |                                        │      │
+│ |         - Rephrase Query   |--------------------------------------->│      │
+│ |         - Uses LLM         |   Output: Expanded set of questions    │      │
+│ +────────────────────────────+                                        ▼      │
+│ +────────────────────────────+                                        │      │
+│ | STEP 4: Retrieval          |                                        │      │
+│ |         - OpenAI Embedding |                                        │      │
+│ |         - Qdrant Search    |--------------------------------------->│      │
+│ |                            |   Output: ~80 candidate passages       │      │
+│ +────────────────────────────+                                        ▼      │
+│ +────────────────────────────+                                        │      │
+│ | STEP 5: Re-Ranking         |                                        │      │
+│ |         - Gemini Embedding |                                        │      │
+│ |         - Score & Sort     |--------------------------------------->│      │
+│ |                            |   Output: Top 5–7 highly relevant      │      │
+│ +────────────────────────────+     clean passages                     ▼      │
+│ +────────────────────────────+                                        │      │
+│ | STEP 6: Final Generation   |                                        │      │
+│ |         - Use agent-specific|                                       │      │
+│ |           signature (LLM)  |--------------------------------------->│      │
+│ |                            |   Output: Final Answer with Context    │      │
+│ +────────────────────────────+                                        ▼      │
+│                                                                       ▼      │
+│         Final JSON Response (Answer + Context + Intent Metadata)             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+───────────────────────────────────────────────────────────────────────────────
+                    Step-by-Step Flow for Sample Query
+───────────────────────────────────────────────────────────────────────────────
+
+User Query: "what about a unique key?"  
+Chat History: "User: What is a primary key?"
+
+1️⃣ Step 1: Condense with History  
+   - LLM processes the chat history and question.
+   - Output: "What is a unique key and how does it compare to a primary key?"
+
+2️⃣ Step 2: Orchestrator Agent  
+   - LLM classifies the intent: "Comparative"
+   - Routed to: `ComparativeRAG` agent
+
+3️⃣ Step 3: Query Expansion  
+   - Input to LLM: Standalone question  
+   - Generated Expanded Questions:
+     - "What are the properties of a unique key in a database?"
+     - "Can a unique key have NULL values?"
+     - "What is the main difference between primary and unique keys?"
+   - Final list: [Original Question + 3 Expanded Questions]
+
+4️⃣ Step 4: Retrieval  
+   - Each query embedded using OpenAI model
+   - Each embedding queried against Qdrant vector DB
+   - Retrieved passages (20 per query) are pooled (~80 total)
+
+5️⃣ Step 5: Re-Ranking  
+   - Gemini model re-embeds all passages and the question
+   - Calculates relevance scores and ranks them
+   - Selects Top 5–7 refined, clean passages
+
+6️⃣ Step 6: Final Generation  
+   - Agent sends final context + question to GPT (e.g., GPT-4o)
+   - Prompt:  
+     ```
+     Context: [7 refined passages]
+     Question: What is a unique key and how does it compare to a primary key?
+     Comparison: [LLM-generated detailed comparison]
+     ```
+   - Output: A structured and clear comparative answer
+
+7️⃣ Final API Response  
+   - JSON with fields:
+     - `answer`: Final generated response
+     - `context`: Supporting refined passages
+     - `intent`: Detected intent (e.g., Comparative)
+
+───────────────────────────────────────────────────────────────────────────────

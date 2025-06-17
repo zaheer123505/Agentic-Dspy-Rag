@@ -1,0 +1,30 @@
+# docker-compose.yml
+# A professional way to manage our Qdrant database service.
+
+# The version of the docker-compose file format we are using.
+version: '3.8'
+
+# This section defines the services (containers) we want to run.
+services:
+  # We are naming our service "qdrant" for clarity.
+  qdrant:
+    # This tells Docker to use the official Qdrant image from Docker Hub.
+    image: qdrant/qdrant:latest
+    
+    # This ensures the container will restart automatically if it ever crashes.
+    restart: always
+    
+    # This maps the ports from your computer (host) to the container.
+    # Format is "HOST:CONTAINER"
+    ports:
+      - "6333:6333" # The API port our Python script uses.
+      - "6334:6334" # The web dashboard port you use in your browser.
+      
+    # This is the most important part for data persistence.
+    # It links a local folder to the container's internal storage folder.
+    volumes:
+      - ./qdrant_data:/qdrant/storage
+
+# This section defines the named volumes. It's good practice to declare them.
+volumes:
+  qdrant_data:
