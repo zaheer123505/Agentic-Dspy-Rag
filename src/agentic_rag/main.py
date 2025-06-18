@@ -71,7 +71,7 @@ def startup_event():
         raise ValueError("One or more environment variables are missing. Check your .env file.")
 
     # Configure the primary Large Language Model (LLM) for DSPy to use.
-    llm = dspy.OpenAI(model='gpt-4o', api_key=openai_api_key, max_tokens=1500)
+    llm = dspy.LM(model='gpt-4o', api_key=openai_api_key, max_tokens=1500)
     dspy.settings.configure(lm=llm)
     print("DSPy's LLM configured.")
     
